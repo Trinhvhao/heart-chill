@@ -8,7 +8,7 @@ const HeartShaderMaterial = {
   uniforms: {
     uTime: { value: 0 },
     uPixelRatio: { value: 1 },
-    uSize: { value: 200.0 },
+    uSize: { value: 250.0 },
   },
   vertexShader: `
     uniform float uTime;
@@ -25,8 +25,8 @@ const HeartShaderMaterial = {
       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
       
-      // Twinkle logic: sine wave based on time and random offset
-      float pulse = sin(uTime * 3.0 + aRandom * 15.0) * 0.3 + 0.9;
+      // Twinkle logic
+      float pulse = sin(uTime * 4.0 + aRandom * 20.0) * 0.4 + 0.8;
       
       gl_PointSize = uSize * aScale * pulse * uPixelRatio / -mvPosition.z;
     }
@@ -35,15 +35,14 @@ const HeartShaderMaterial = {
     varying vec3 vColor;
     
     void main() {
-      // Circle shape
-      float r = distance(gl_PointCoord, vec2(0.5));
-      if (r > 0.5) discard;
+      float d = distance(gl_PointCoord, vec2(0.5));
+      if (d > 0.5) discard;
 
-      // Soft glow gradient from center
-      float strength = 1.0 - (r * 2.0);
-      strength = pow(strength, 2.0); // Make it sharper
+      // Sharp gradient
+      float strength = 1.0 - (d * 2.0);
+      strength = pow(strength, 3.0); 
 
-      gl_FragColor = vec4(vColor * strength, 1.0);
+      gl_FragColor = vec4(vColor, strength); 
     }
   `
 };
@@ -58,19 +57,14 @@ const HeartParticles: React.FC<HeartParticleProps> = ({ count = 15000, scale = 1
     const randoms = [];
     const scales = [];
     
-    // --- PARAMETRIC CONFIGURATION ---
-    // Surface Equation:
-    // x = 16sin^3(u) * sin(v)
-    // y = (13cos(u) - 5cos(2u) - 2cos(3u) - cos(4u)) * sin(v)
-    // z = 6cos(v)
-    // u [0, 2PI], v [0, PI]
-    
-    const shellCount = Math.floor(count * 0.85); // 85% particles on the surface
+    // CRITICAL FIX: Reduce core density significantly.
+    // Overlapping particles in the center cause whiteout due to additive blending.
+    // 92% Shell, 8% Core (just faint dust)
+    const shellCount = Math.floor(count * 0.92); 
     const coreCount = count - shellCount;
 
-    // Helper to add a particle
     const addParticle = (u: number, v: number, isShell: boolean) => {
-      // Standard Parametric Heart Formulas
+      // Parametric Heart Formula
       const xBase = 16 * Math.pow(Math.sin(u), 3);
       const yBase = 13 * Math.cos(u) - 5 * Math.cos(2 * u) - 2 * Math.cos(3 * u) - Math.cos(4 * u);
       
@@ -86,9 +80,9 @@ const HeartParticles: React.FC<HeartParticleProps> = ({ count = 15000, scale = 1
       y *= normalizeFactor;
       z *= normalizeFactor;
 
-      // If Core, pull particle inside
       if (!isShell) {
-        const r = Math.pow(Math.random(), 0.5); 
+        // Push core particles deeper inside
+        const r = Math.pow(Math.random(), 0.8); 
         x *= r;
         y *= r;
         z *= r;
@@ -97,26 +91,26 @@ const HeartParticles: React.FC<HeartParticleProps> = ({ count = 15000, scale = 1
       positions.push(x, y, z);
       randoms.push(Math.random());
 
-      // --- COLOR & SIZE LOGIC (UPDATED) ---
+      // --- COLOR & SIZE LOGIC ---
       if (isShell) {
-        scales.push(1.5); // Shell particles larger
+        scales.push(1.5); 
         
-        // Edge Color: Extremely Bright to trigger Bloom
+        // Shell: HDR Colors (Values > 1.0)
         const isHighlight = Math.random() > 0.4;
         if (isHighlight) {
-          // Sparkling White (Intensity > 1.2 triggers bloom)
-          colors.push(4.0, 4.0, 4.5); 
+          // Diamond White
+          colors.push(5.0, 5.0, 6.0); 
         } else {
-          // Neon Pink (High Red/Blue intensity)
-          colors.push(3.5, 0.2, 1.8);
+          // Neon Pink
+          colors.push(4.0, 0.1, 2.0);
         }
       } else {
-        scales.push(0.6); // Core particles smaller
+        // Core: TINY and VERY DARK
+        scales.push(0.3); 
         
-        // Core Color: DIMMED SIGNIFICANTLY
-        // RGB values < 1.0 will NOT trigger bloom
-        // Dark red/pink for volume
-        colors.push(0.4, 0.05, 0.15);
+        // Intensity ~0.02. Even if 50 particles overlap, it reaches only ~1.0.
+        // This prevents the white blob center.
+        colors.push(0.05, 0.005, 0.01);
       }
     };
 
@@ -150,7 +144,6 @@ const HeartParticles: React.FC<HeartParticleProps> = ({ count = 15000, scale = 1
 
     if (mesh.current) {
       const time = state.clock.getElapsedTime();
-      // Gentle floating heartbeat
       const beat = Math.sin(time * 2.0) * 0.05 + Math.sin(time * 4.0) * 0.01; 
       
       const currentScale = scale + beat * 0.1;

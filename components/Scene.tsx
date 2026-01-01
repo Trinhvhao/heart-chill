@@ -13,14 +13,11 @@ const Scene: React.FC = () => {
         
         <color attach="background" args={['#050105']} />
         
-        {/* Lights - Mostly for scene ambiance, particles use emissive shader */}
-        <ambientLight intensity={0.2} color="#ffb6c1" />
+        <ambientLight intensity={0.1} color="#ffb6c1" />
         
-        {/* Objects - High count for high definition */}
         <HeartParticles count={15000} scale={1} />
         <Background />
 
-        {/* Controls - No AutoRotate */}
         <OrbitControls 
           enablePan={false} 
           enableZoom={true} 
@@ -29,19 +26,18 @@ const Scene: React.FC = () => {
           autoRotate={false}
         />
 
-        {/* Post Processing Effects */}
         <EffectComposer enableNormalPass={false}>
           {/* 
-             Bloom Threshold: 1.1
-             This is CRITICAL:
-             - Core particles have color intensity ~0.4 -> NO GLOW
-             - Shell particles have color intensity ~3.5 -> STRONG GLOW
+             Bloom Settings Tuning:
+             - luminanceThreshold: 1.5 -> Very High. Only shell particles (intensity ~5.0) will glow.
+             - radius: 0.3 -> Tight glow around the sparks.
+             - intensity: 1.5 -> Make the shell pop.
           */}
           <Bloom 
-            luminanceThreshold={1.1} 
+            luminanceThreshold={1.5} 
             mipmapBlur 
-            intensity={2.0} 
-            radius={0.6}
+            intensity={1.5} 
+            radius={0.3}
             levels={8}
           />
           <Vignette eskil={false} offset={0.1} darkness={1.1} />
